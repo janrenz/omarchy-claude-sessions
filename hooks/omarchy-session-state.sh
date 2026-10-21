@@ -4,6 +4,7 @@
 #
 #   omarchy-session-state.sh <start|prompt|tool|notify|stop|fail|end|prune>
 #   omarchy-session-state.sh focus <window-address>
+#   omarchy-session-state.sh launch <account-id>
 #
 # State lives in ~/.local/state/claude-sessions/: one sessions/<id>.json per
 # live session, and index.json (all of them as one array) that the widget
@@ -17,7 +18,10 @@ sessions="$dir/sessions"
 mkdir -p "$sessions" 2>/dev/null || exit 0
 
 input=""
-[ "$action" = "prune" ] || input="$(cat 2>/dev/null || true)"
+case "$action" in
+  prune|focus|launch) ;;
+  *) input="$(cat 2>/dev/null || true)" ;;
+esac
 
 field() { printf '%s' "$input" | jq -r "$1 // empty" 2>/dev/null; }
 
@@ -64,6 +68,35 @@ focus() {
   fi
   hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null 2>&1
 }
+
+# Opens a new Claude session in a terminal, signed in as one of the accounts
+# `omarchy agent account` knows. Mirrors omarchy-agent: the account's home and
+# Omarchy's pin travel in the command, since terminals started through uwsm
+# don't inherit this environment. The primary account pins an empty home, so
+# Claude keeps its implicit ~/.claude and ~/.claude.json.
+launch() {
+  info="$(omarchy agent account list claude --json 2>/dev/null \
+    | jq -c --arg a "$1" '.[0].accounts[] | select(.id == $a and .signedIn)' 2>/dev/null)"
+  [ -n "$info" ] || return 0
+  home="$(printf '%s' "$info" | jq -r '.home // empty')"
+  if [ "$(printf '%s' "$info" | jq -r '.primary')" = "true" ]; then
+    set -- env -u CLAUDE_CONFIG_DIR OMARCHY_AGENT_CLAUDE_HOME=
+  else
+    [ -n "$home" ] || return 0
+    set -- env -u CLAUDE_CONFIG_DIR "OMARCHY_AGENT_CLAUDE_HOME=$home" "CLAUDE_CONFIG_DIR=$home"
+  fi
+  # Claude won't remember trust for $HOME, so start where omarchy-agent does.
+  workdir="$HOME/Work"
+  [ -d "$workdir" ] || workdir="$HOME"
+  exec setsid uwsm-app -- xdg-terminal-exec --app-id=org.omarchy.agent --dir="$workdir" \
+    -e "$@" claude --permission-mode auto
+}
+
+if [ "$action" = "launch" ]; then
+  case "${2:-}" in ""|-*|*/*) exit 0 ;; esac
+  launch "$2"
+  exit 0
+fi
 
 if [ "$action" = "prune" ]; then
   prune
@@ -112,6 +145,12 @@ if [ "${pid:-0}" = "0" ] || [ -z "$window" ]; then
     p="$(awk '{print $4}' /proc/"$p"/stat 2>/dev/null)"
   done
 fi
+
+# The account this session runs as: Claude reads its login from
+# CLAUDE_CONFIG_DIR, which `omarchy agent account` points at an added
+# account's home and leaves unset for the primary one in ~/.claude.
+home="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+home="${home%/}"
 
 cwd="$(field .cwd)"
 [ -n "$cwd" ] || cwd="$PWD"
@@ -166,10 +205,10 @@ started="$(jq -r '.started // empty' "$file" 2>/dev/null)"
 tmp="$sessions/.$id.$$"
 jq -n \
   --arg id "$id" --arg cwd "$cwd" --arg project "$project" --arg state "$state" \
-  --arg message "$message" --arg window "$window" \
+  --arg message "$message" --arg window "$window" --arg home "$home" \
   --argjson pid "${pid:-0}" --argjson started "$started" --argjson updated "$now" \
   '{id: $id, cwd: $cwd, project: $project, state: $state, message: $message,
-    window: $window, pid: $pid, started: $started, updated: $updated}' >"$tmp" \
+    window: $window, home: $home, pid: $pid, started: $started, updated: $updated}' >"$tmp" \
   && mv -f "$tmp" "$file"
 rm -f "$tmp"
 

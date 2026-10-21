@@ -4,9 +4,14 @@ A bar widget showing every running Claude Code session at a glance: working,
 waiting for you, idle, or stopped on an error.
 
 - The icon **pulses** while a session is working, turns **urgent** with a count
-  while any session needs you, and hides when no session runs.
+  while any session needs you, and hides when no session runs and no account
+  is set up.
 - Click it for the list: project, state, how long ago it changed, the last
-  message and the working directory.
+  message, the working directory and — with more than one subscription — the
+  account it runs as.
+- **Accounts** (from `omarchy agent account`): each Claude subscription with
+  its plan, how many sessions run as it, and its session and weekly limits.
+  The **+** next to one opens a new session signed in as that account.
 - **Click a session to jump to its terminal.** A session on the agent shelf
   (`special:scratchpad`) opens the shelf if it is closed; any other session
   switches to its workspace, closing an open shelf on the way.
