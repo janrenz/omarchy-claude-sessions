@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "jan.claude-sessions",
+  "name": "Claude Sessions",
+  "version": "1.0.0",
+  "author": "jan",
+  "description": "Live state of running Claude Code sessions: working, waiting for you, or idle",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Claude Sessions",
+    "description": "Live state of running Claude Code sessions; click one to jump to its terminal",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}
