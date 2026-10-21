@@ -167,7 +167,14 @@ Panel {
   implicitHeight: visible ? button.implicitHeight : 0
 
   onVisibleChanged: if (!visible) close()
-  onOpenedChanged: if (opened) { nowMs = Date.now(); refreshAccounts() }
+  // Opening the list asks for limits no older than five minutes.
+  onOpenedChanged: if (opened) { nowMs = Date.now(); refreshAccounts(); updateUsage(300) }
+
+  function updateUsage(maxAge) {
+    if (usageProc.running) return
+    usageProc.command = ["sh", root.hookScript, "usage", String(maxAge)]
+    usageProc.running = true
+  }
 
   FileView {
     path: root.stateDir + "/index.json"
@@ -199,8 +206,24 @@ Panel {
     }
   }
 
+  // Asks Anthropic for the limits, which Omarchy's agents plugin would
+  // otherwise do; the new record then arrives through the file watch below.
+  Process {
+    id: usageProc
+  }
+
+  // Limits are a remote API with no change signal, so they are polled, at
+  // the agents plugin's own fifteen-minute pace.
+  Timer {
+    interval: 900000
+    running: true
+    repeat: true
+    triggeredOnStart: true
+    onTriggered: root.updateUsage(840)
+  }
+
   // The registry changes when an account is added, renamed or switched to;
-  // the usage record each time the agents plugin collects limits again.
+  // the usage record each time the limits are collected again.
   FileView {
     path: root.accountsDir + "/accounts/claude.json"
     watchChanges: true

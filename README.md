@@ -12,6 +12,11 @@ waiting for you, idle, or stopped on an error.
 - **Accounts** (from `omarchy agent account`): each Claude subscription with
   its plan, how many sessions run as it, and its session and weekly limits.
   The **+** next to one opens a new session signed in as that account.
+  The limits are collected again every 15 minutes, and when the list opens
+  on data older than five minutes, so the widget works with Omarchy's own
+  agents plugin disabled.
+- **Status line** (`hooks/omarchy-statusline.sh`): every Claude Code session
+  shows the account it runs as, its plan, email and limits under the prompt.
 - **Click a session to jump to its terminal.** A session on the agent shelf
   (`special:scratchpad`) opens the shelf if it is closed; any other session
   switches to its workspace, closing an open shelf on the way.
@@ -57,6 +62,22 @@ Then register the hook in `~/.claude/settings.json`:
 ```
 
 Sessions started before the hook was registered appear from their next prompt.
+
+For the account in Claude Code's status line:
+
+```sh
+ln -s ~/.config/omarchy/plugins/jan.claude-sessions/hooks/omarchy-statusline.sh \
+  ~/.claude/hooks/omarchy-statusline.sh
+```
+
+```json
+{
+  "statusLine": { "type": "command", "command": "sh \"$HOME/.claude/hooks/omarchy-statusline.sh\"" }
+}
+```
+
+An existing Orca status line script (`~/.orca/agent-hooks/claude-statusline.sh`)
+keeps receiving every payload.
 
 ## License
 

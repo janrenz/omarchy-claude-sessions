@@ -5,6 +5,7 @@
 #   omarchy-session-state.sh <start|prompt|tool|notify|stop|fail|end|prune>
 #   omarchy-session-state.sh focus <window-address>
 #   omarchy-session-state.sh launch <account-id>
+#   omarchy-session-state.sh usage <max-age-seconds>
 #
 # State lives in ~/.local/state/claude-sessions/: one sessions/<id>.json per
 # live session, and index.json (all of them as one array) that the widget
@@ -19,7 +20,7 @@ mkdir -p "$sessions" 2>/dev/null || exit 0
 
 input=""
 case "$action" in
-  prune|focus|launch) ;;
+  prune|focus|launch|usage) ;;
   *) input="$(cat 2>/dev/null || true)" ;;
 esac
 
@@ -91,6 +92,25 @@ launch() {
   exec setsid uwsm-app -- xdg-terminal-exec --app-id=org.omarchy.agent --dir="$workdir" \
     -e "$@" claude --permission-mode auto
 }
+
+# Collects Claude's limits again unless the record is younger than the given
+# age. Stands in for Omarchy's agents plugin when that one is disabled; the
+# update also notifies (or switches accounts) near the threshold. Every
+# monitor's widget asks, so the age check and the lock keep it to one run.
+usage() {
+  record="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/agents/usage/claude.json"
+  if [ -f "$record" ]; then
+    age=$(( $(date +%s) - $(stat -c %Y "$record") ))
+    [ "$age" -lt "$1" ] && return 0
+  fi
+  exec flock -n "$dir/.usage.lock" omarchy-agent-usage-update claude
+}
+
+if [ "$action" = "usage" ]; then
+  case "${2:-}" in ""|*[!0-9]*) exit 0 ;; esac
+  usage "$2"
+  exit 0
+fi
 
 if [ "$action" = "launch" ]; then
   case "${2:-}" in ""|-*|*/*) exit 0 ;; esac
